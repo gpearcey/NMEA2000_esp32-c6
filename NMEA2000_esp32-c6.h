@@ -44,10 +44,10 @@ before including NMEA2000_esp32.h or NMEA2000_CAN.h
 #include "ESP32_CAN_def.h"
 
 #ifndef ESP32_CAN_TX_PIN
-#define ESP32_CAN_TX_PIN GPIO_NUM_16
+#define ESP32_CAN_TX_PIN GPIO_NUM_4
 #endif
 #ifndef ESP32_CAN_RX_PIN
-#define ESP32_CAN_RX_PIN GPIO_NUM_4
+#define ESP32_CAN_RX_PIN GPIO_NUM_5
 #endif
 
 class tNMEA2000_esp32c6 : public tNMEA2000
@@ -83,7 +83,7 @@ protected:
   virtual void InitCANFrameBuffers();
 
 public:
-  tNMEA2000_esp32c6(int _ControllerNumber, gpio_num_t _TxPin=ESP32_CAN_TX_PIN,  gpio_num_t _RxPin=ESP32_CAN_RX_PIN);
+  tNMEA2000_esp32c6(gpio_num_t _TxPin=ESP32_CAN_TX_PIN,  gpio_num_t _RxPin=ESP32_CAN_RX_PIN);
 
   void InterruptHandler();
 };

@@ -37,7 +37,7 @@ can.h library, which may cause even naming problem.
 
 #include "rom/gpio.h"
 #include "soc/gpio_sig_map.h"
-#include "soc/dport_reg.h"
+#include "soc/pcr_reg.h"
 #include "soc/dport_access.h"
 #include "NMEA2000_esp32-c6.h"
 
@@ -54,9 +54,7 @@ void ESP32Can1Interrupt(void *);
 tNMEA2000_esp32c6::tNMEA2000_esp32c6(gpio_num_t _TxPin,  gpio_num_t _RxPin) :
     tNMEA2000(), IsOpen(false),
                                                                          speed(CAN_SPEED_250KBPS), TxPin(_TxPin), RxPin(_RxPin),
-    RxQueue(NULL), TxQueue(NULL) {
-      //todo - throw error if controller number is not 0 pr 1
-}
+    RxQueue(NULL), TxQueue(NULL) {}
 
 //*****************************************************************************
 bool tNMEA2000_esp32c6::CANSendFrame(unsigned long id, unsigned char len, const unsigned char *buf, bool /*wait_sent*/) {
@@ -129,6 +127,7 @@ void tNMEA2000_esp32c6::CAN_init() {
   // A soft reset of the ESP32 leaves it's CAN/TWAI controller in an undefined state so a reset is needed.
   // Reset CAN/TWAI controller to same state as it would be in after a power down reset.
   periph_module_reset(PERIPH_TWAI0_MODULE);
+  //periph_module_enable(PERIPH_TWAI0_MODULE);
 
   // enable module
   //DPORT_SET_PERI_REG_MASK(DPORT_PERIP_CLK_EN_REG, DPORT_TWAI_CLK_EN);
@@ -136,8 +135,18 @@ void tNMEA2000_esp32c6::CAN_init() {
 
   // enable module PCR
   SET_PERI_REG_MASK(PCR_TWAI0_CONF_REG, PCR_TWAI0_CLK_EN);
-  CLEAR_PERI_REG_MASK(PCR_TWAI0_CONF_REG,PCR_TWAI0_RST_EN);
+  SET_PERI_REG_MASK(PCR_TWAI0_CONF_REG, PCR_TWAI0_RST_EN);
 
+  CLEAR_PERI_REG_MASK(PCR_TWAI0_FUNC_CLK_CONF_REG, PCR_TWAI0_FUNC_CLK_SEL);
+  SET_PERI_REG_MASK(PCR_TWAI0_FUNC_CLK_CONF_REG, PCR_TWAI0_FUNC_CLK_EN);
+
+
+
+
+
+
+  //CLEAR_PERI_REG_MASK(PCR_TWAI0_CONF_REG,PCR_TWAI0_RST_EN);
+//
   //might need to select a clock
 
   // configure RX pin
@@ -149,10 +158,10 @@ void tNMEA2000_esp32c6::CAN_init() {
 	MODULE_CAN_0->CDR.B.CAN_M=0x1;
 
 	//synchronization jump width is the same for all baud rates
-	MODULE_CAN_0->BTR0.B.SJW		=0x1;
+	MODULE_CAN_0->BTR0.B.SJW		=0x3;
 
 	//TSEG2 is the same for all baud rates
-	MODULE_CAN_0->BTR1.B.TSEG2	=0x1;
+	MODULE_CAN_0->BTR1.B.TSEG2	=0x4;
 
 	//select time quantum and set TSEG1
 	switch (speed) {
@@ -166,7 +175,7 @@ void tNMEA2000_esp32c6::CAN_init() {
     __tq = 0.125;
     break;
   default:
-    MODULE_CAN_0->BTR1.B.TSEG1	=0xc;
+    MODULE_CAN_0->BTR1.B.TSEG1	=0xf;
     __tq = ((float)1000 / (float)speed) / 16;
   }
 
@@ -176,7 +185,7 @@ void tNMEA2000_esp32c6::CAN_init() {
   /* Set sampling
    * 1 -> triple; the bus is sampled three times; recommended for low/medium speed buses     (class A and B) where filtering spikes on the bus line is beneficial
    * 0 -> single; the bus is sampled once; recommended for high speed buses (SAE class C)*/
-    MODULE_CAN_0->BTR1.B.SAM	=0x1;
+    MODULE_CAN_0->BTR1.B.SAM	=0x0;
 
     //enable all interrupts
     MODULE_CAN_0->IER.U = 0xef;  // bit 0x10 contains Baud Rate Prescaler Divider (BRP_DIV) bit
@@ -215,6 +224,7 @@ void tNMEA2000_esp32c6::CAN_init() {
 
     //Showtime. Release Reset Mode.
   MODULE_CAN_0->MOD.B.RM = 0;
+  CLEAR_PERI_REG_MASK(PCR_TWAI0_CONF_REG, PCR_TWAI0_RST_EN);
 }
 
 //*****************************************************************************
@@ -229,7 +239,7 @@ void tNMEA2000_esp32c6::CAN_read_frame() {
   // Handle only extended frames
   if (FIR.B.FF==CAN_frame_ext) {  //extended frame
     //Get Message ID
-    frame.id = _CAN_GET_EXT_ID;
+    frame.id = _CAN_GET_EXT_ID_0;
 
     //deep copy data bytes
     for( size_t i=0; i<frame.len; i++ ) {
@@ -246,6 +256,7 @@ void tNMEA2000_esp32c6::CAN_read_frame() {
 
 //*****************************************************************************
 void tNMEA2000_esp32c6::CAN_send_frame(tCANFrame &frame) {
+  printf("CAN_Send_frame");
   CAN_FIR_t FIR;
 
   FIR.U=0;
@@ -256,7 +267,7 @@ void tNMEA2000_esp32c6::CAN_send_frame(tCANFrame &frame) {
 	MODULE_CAN_0->MBX_CTRL.FCTRL.FIR.U=FIR.U;
 
   //Write message ID
-  _CAN_SET_EXT_ID(frame.id);
+  _CAN_SET_EXT_ID_0(frame.id);
 
   // Copy the frame data to the hardware
   for ( size_t i=0; i<frame.len; i++) {
