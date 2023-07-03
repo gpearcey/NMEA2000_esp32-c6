@@ -39,19 +39,19 @@ can.h library, which may cause even naming problem.
 #include "soc/gpio_sig_map.h"
 #include "soc/dport_reg.h"
 #include "soc/dport_access.h"
-#include "NMEA2000_esp32.h"
+#include "NMEA2000_esp32-c6.h"
 
 #if !defined(round)
 #include <math.h>
 #endif
 
-bool tNMEA2000_esp32::CanInUse=false;
-tNMEA2000_esp32 *pNMEA2000_esp32=0;
+bool tNMEA2000_esp32c6::CanInUse=false;
+tNMEA2000_esp32c6 *pNMEA2000_esp32=0;
 
 void ESP32Can1Interrupt(void *);
 
 //*****************************************************************************
-tNMEA2000_esp32::tNMEA2000_esp32(gpio_num_t _TxPin,  gpio_num_t _RxPin) :
+tNMEA2000_esp32c6::tNMEA2000_esp32c6(gpio_num_t _TxPin,  gpio_num_t _RxPin) :
     tNMEA2000(), IsOpen(false),
                                                                          speed(CAN_SPEED_250KBPS), TxPin(_TxPin), RxPin(_RxPin),
     RxQueue(NULL), TxQueue(NULL) {
@@ -59,7 +59,7 @@ tNMEA2000_esp32::tNMEA2000_esp32(gpio_num_t _TxPin,  gpio_num_t _RxPin) :
 }
 
 //*****************************************************************************
-bool tNMEA2000_esp32::CANSendFrame(unsigned long id, unsigned char len, const unsigned char *buf, bool /*wait_sent*/) {
+bool tNMEA2000_esp32c6::CANSendFrame(unsigned long id, unsigned char len, const unsigned char *buf, bool /*wait_sent*/) {
   if ( uxQueueSpacesAvailable(TxQueue)==0 ) return false; // can not send to queue
 
   tCANFrame frame;
@@ -68,9 +68,9 @@ bool tNMEA2000_esp32::CANSendFrame(unsigned long id, unsigned char len, const un
   memcpy(frame.buf,buf,len);
 
   xQueueSendToBack(TxQueue,&frame,0);  // Add frame to queue
-  if ( MODULE_CAN->SR.B.TBS==0 ) return true; // Currently sending, ISR takes care of sending
+  if ( MODULE_CAN_0->SR.B.TBS==0 ) return true; // Currently sending, ISR takes care of sending
 
-  if ( MODULE_CAN->SR.B.TBS==1 ) { // Check again and restart send, if is not going on
+  if ( MODULE_CAN_0->SR.B.TBS==1 ) { // Check again and restart send, if is not going on
     xQueueReceive(TxQueue,&frame,0);
     CAN_send_frame(frame);
   }
@@ -79,7 +79,7 @@ bool tNMEA2000_esp32::CANSendFrame(unsigned long id, unsigned char len, const un
 }
 
 //*****************************************************************************
-void tNMEA2000_esp32::InitCANFrameBuffers() {
+void tNMEA2000_esp32c6::InitCANFrameBuffers() {
     if (MaxCANReceiveFrames<10 ) MaxCANReceiveFrames=50; // ESP32 has plenty of RAM
     if (MaxCANSendFrames<10 ) MaxCANSendFrames=40;
     uint16_t CANGlobalBufSize=MaxCANSendFrames-4;
@@ -91,7 +91,7 @@ void tNMEA2000_esp32::InitCANFrameBuffers() {
 }
 
 //*****************************************************************************
-bool tNMEA2000_esp32::CANOpen() {
+bool tNMEA2000_esp32c6::CANOpen() {
     if (IsOpen) return true;
 
     if (CanInUse) return false; // currently prevent accidental second instance. Maybe possible in future.
@@ -106,7 +106,7 @@ bool tNMEA2000_esp32::CANOpen() {
 }
 
 //*****************************************************************************
-bool tNMEA2000_esp32::CANGetFrame(unsigned long &id, unsigned char &len, unsigned char *buf) {
+bool tNMEA2000_esp32c6::CANGetFrame(unsigned long &id, unsigned char &len, unsigned char *buf) {
   bool HasFrame=false;
   tCANFrame frame;
 
@@ -122,106 +122,108 @@ bool tNMEA2000_esp32::CANGetFrame(unsigned long &id, unsigned char &len, unsigne
 }
 
 //*****************************************************************************
-void tNMEA2000_esp32::CAN_init() {
-
+void tNMEA2000_esp32c6::CAN_init() {
 	//Time quantum
   double __tq;
 
   // A soft reset of the ESP32 leaves it's CAN/TWAI controller in an undefined state so a reset is needed.
   // Reset CAN/TWAI controller to same state as it would be in after a power down reset.
-
   periph_module_reset(PERIPH_TWAI0_MODULE);
 
-  
-
   // enable module
-  DPORT_SET_PERI_REG_MASK(DPORT_PERIP_CLK_EN_REG, DPORT_TWAI_CLK_EN);
-  DPORT_CLEAR_PERI_REG_MASK(DPORT_PERIP_RST_EN_REG, DPORT_TWAI_RST);
+  //DPORT_SET_PERI_REG_MASK(DPORT_PERIP_CLK_EN_REG, DPORT_TWAI_CLK_EN);
+  //DPORT_CLEAR_PERI_REG_MASK(DPORT_PERIP_RST_EN_REG, DPORT_TWAI_RST);
+
+  // enable module PCR
+  SET_PERI_REG_MASK(PCR_TWAI0_CONF_REG, PCR_TWAI0_CLK_EN);
+  CLEAR_PERI_REG_MASK(PCR_TWAI0_CONF_REG,PCR_TWAI0_RST_EN);
+
+  //might need to select a clock
 
   // configure RX pin
   gpio_set_direction(RxPin, GPIO_MODE_INPUT);
-  gpio_matrix_in(RxPin, TWAI_RX_IDX, 0);
+  gpio_matrix_in(RxPin, TWAI0_RX_IDX, 0);
   gpio_pad_select_gpio(RxPin);
 
     //set to PELICAN mode
-	MODULE_CAN->CDR.B.CAN_M=0x1;
+	MODULE_CAN_0->CDR.B.CAN_M=0x1;
 
 	//synchronization jump width is the same for all baud rates
-	MODULE_CAN->BTR0.B.SJW		=0x1;
+	MODULE_CAN_0->BTR0.B.SJW		=0x1;
 
 	//TSEG2 is the same for all baud rates
-	MODULE_CAN->BTR1.B.TSEG2	=0x1;
+	MODULE_CAN_0->BTR1.B.TSEG2	=0x1;
 
 	//select time quantum and set TSEG1
 	switch (speed) {
   case CAN_SPEED_1000KBPS:
-			MODULE_CAN->BTR1.B.TSEG1	=0x4;
+			MODULE_CAN_0->BTR1.B.TSEG1	=0x4;
     __tq = 0.125;
     break;
 
   case CAN_SPEED_800KBPS:
-			MODULE_CAN->BTR1.B.TSEG1	=0x6;
+			MODULE_CAN_0->BTR1.B.TSEG1	=0x6;
     __tq = 0.125;
     break;
   default:
-    MODULE_CAN->BTR1.B.TSEG1	=0xc;
+    MODULE_CAN_0->BTR1.B.TSEG1	=0xc;
     __tq = ((float)1000 / (float)speed) / 16;
   }
 
 	//set baud rate prescaler
-	MODULE_CAN->BTR0.B.BRP=(uint8_t)round((((APB_CLK_FREQ * __tq) / 2) - 1)/1000000)-1;
+	MODULE_CAN_0->BTR0.B.BRP=(uint8_t)round((((APB_CLK_FREQ * __tq) / 2) - 1)/1000000)-1;
 
   /* Set sampling
    * 1 -> triple; the bus is sampled three times; recommended for low/medium speed buses     (class A and B) where filtering spikes on the bus line is beneficial
    * 0 -> single; the bus is sampled once; recommended for high speed buses (SAE class C)*/
-    MODULE_CAN->BTR1.B.SAM	=0x1;
+    MODULE_CAN_0->BTR1.B.SAM	=0x1;
 
     //enable all interrupts
-    MODULE_CAN->IER.U = 0xef;  // bit 0x10 contains Baud Rate Prescaler Divider (BRP_DIV) bit
+    MODULE_CAN_0->IER.U = 0xef;  // bit 0x10 contains Baud Rate Prescaler Divider (BRP_DIV) bit
 
     //no acceptance filtering, as we want to fetch all messages
-  MODULE_CAN->MBX_CTRL.ACC.CODE[0] = 0;
-  MODULE_CAN->MBX_CTRL.ACC.CODE[1] = 0;
-  MODULE_CAN->MBX_CTRL.ACC.CODE[2] = 0;
-  MODULE_CAN->MBX_CTRL.ACC.CODE[3] = 0;
-  MODULE_CAN->MBX_CTRL.ACC.MASK[0] = 0xff;
-  MODULE_CAN->MBX_CTRL.ACC.MASK[1] = 0xff;
-  MODULE_CAN->MBX_CTRL.ACC.MASK[2] = 0xff;
-  MODULE_CAN->MBX_CTRL.ACC.MASK[3] = 0xff;
+  MODULE_CAN_0->MBX_CTRL.ACC.CODE[0] = 0;
+  MODULE_CAN_0->MBX_CTRL.ACC.CODE[1] = 0;
+  MODULE_CAN_0->MBX_CTRL.ACC.CODE[2] = 0;
+  MODULE_CAN_0->MBX_CTRL.ACC.CODE[3] = 0;
+  MODULE_CAN_0->MBX_CTRL.ACC.MASK[0] = 0xff;
+  MODULE_CAN_0->MBX_CTRL.ACC.MASK[1] = 0xff;
+  MODULE_CAN_0->MBX_CTRL.ACC.MASK[2] = 0xff;
+  MODULE_CAN_0->MBX_CTRL.ACC.MASK[3] = 0xff;
 
     //set to normal mode
-    MODULE_CAN->OCR.B.OCMODE=__CAN_OC_NOM;
+    MODULE_CAN_0->OCR.B.OCMODE=__CAN_OC_NOM;
 
     //clear error counters
-  MODULE_CAN->TXERR.U = 0;
-  MODULE_CAN->RXERR.U = 0;
-  (void)MODULE_CAN->ECC;
+  MODULE_CAN_0->TXERR.U = 0;
+  MODULE_CAN_0->RXERR.U = 0;
+  (void)MODULE_CAN_0->ECC;
 
     //clear interrupt flags
-  (void)MODULE_CAN->IR.U;
+  (void)MODULE_CAN_0->IR.U;
 
   //install CAN ISR
-  esp_intr_alloc(ETS_TWAI_INTR_SOURCE, 0, ESP32Can1Interrupt, NULL, NULL);
+  esp_intr_alloc(ETS_TWAI0_INTR_SOURCE, 0, ESP32Can1Interrupt, NULL, NULL);
 
   //configure TX pin
   // We do late configure, since some initialization above caused CAN Tx flash
   // shortly causing one error frame on startup. By setting CAN pin here
   // it works right.
   gpio_set_direction(TxPin, GPIO_MODE_OUTPUT);
-  gpio_matrix_out(TxPin, TWAI_TX_IDX, 0, 0);
+  gpio_matrix_out(TxPin, TWAI0_TX_IDX, 0, 0);
   gpio_pad_select_gpio(TxPin);
 
     //Showtime. Release Reset Mode.
-  MODULE_CAN->MOD.B.RM = 0;
+  MODULE_CAN_0->MOD.B.RM = 0;
 }
 
 //*****************************************************************************
-void tNMEA2000_esp32::CAN_read_frame() {
+void tNMEA2000_esp32c6::CAN_read_frame() {
   tCANFrame frame;
   CAN_FIR_t FIR;
 
 	//get FIR
-	FIR.U=MODULE_CAN->MBX_CTRL.FCTRL.FIR.U;
+	FIR.U=MODULE_CAN_0->MBX_CTRL.FCTRL.FIR.U;
   frame.len=FIR.B.DLC>8?8:FIR.B.DLC;
 
   // Handle only extended frames
@@ -231,7 +233,7 @@ void tNMEA2000_esp32::CAN_read_frame() {
 
     //deep copy data bytes
     for( size_t i=0; i<frame.len; i++ ) {
-      frame.buf[i]=MODULE_CAN->MBX_CTRL.FCTRL.TX_RX.EXT.data[i];
+      frame.buf[i]=MODULE_CAN_0->MBX_CTRL.FCTRL.TX_RX.EXT.data[i];
     }
 
     //send frame to input queue
@@ -239,11 +241,11 @@ void tNMEA2000_esp32::CAN_read_frame() {
   }
 
   //Let the hardware know the frame has been read.
-  MODULE_CAN->CMR.B.RRB=1;
+  MODULE_CAN_0->CMR.B.RRB=1;
 }
 
 //*****************************************************************************
-void tNMEA2000_esp32::CAN_send_frame(tCANFrame &frame) {
+void tNMEA2000_esp32c6::CAN_send_frame(tCANFrame &frame) {
   CAN_FIR_t FIR;
 
   FIR.U=0;
@@ -251,27 +253,27 @@ void tNMEA2000_esp32::CAN_send_frame(tCANFrame &frame) {
   FIR.B.FF=CAN_frame_ext;
 
 	//copy frame information record
-	MODULE_CAN->MBX_CTRL.FCTRL.FIR.U=FIR.U;
+	MODULE_CAN_0->MBX_CTRL.FCTRL.FIR.U=FIR.U;
 
   //Write message ID
   _CAN_SET_EXT_ID(frame.id);
 
   // Copy the frame data to the hardware
   for ( size_t i=0; i<frame.len; i++) {
-    MODULE_CAN->MBX_CTRL.FCTRL.TX_RX.EXT.data[i]=frame.buf[i];
+    MODULE_CAN_0->MBX_CTRL.FCTRL.TX_RX.EXT.data[i]=frame.buf[i];
   }
 
   // Transmit frame
-  MODULE_CAN->CMR.B.TR=1;
+  MODULE_CAN_0->CMR.B.TR=1;
 }
 
 //*****************************************************************************
-void tNMEA2000_esp32::InterruptHandler() {
+void tNMEA2000_esp32c6::InterruptHandler() {
 	//Interrupt flag buffer
   uint32_t interrupt;
 
   // Read interrupt status and clear flags
-  interrupt = (MODULE_CAN->IR.U & 0xff);
+  interrupt = (MODULE_CAN_0->IR.U & 0xff);
 
   // Handle TX complete interrupt
     if ((interrupt & __CAN_IRQ_TX) != 0) {

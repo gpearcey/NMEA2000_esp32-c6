@@ -70,27 +70,44 @@ typedef union{uint32_t U;					/**< \brief Unsigned access */
 } CAN_FIR_t;
 
 /** \brief Start address of CAN registers */
-#define MODULE_CAN              					((volatile CAN_Module_t    *)0x3ff6b000)
+#define MODULE_CAN_0             					((volatile CAN_Module_t    *)0x6000b000)
+
+#define MODULE_CAN_1                                ((volatile CAN_Module_t    *)0x6000d000)
 
 /** \brief Get standard message ID */
-#define _CAN_GET_STD_ID								(((uint32_t)MODULE_CAN->MBX_CTRL.FCTRL.TX_RX.STD.ID[0] << 3) | \
-													(MODULE_CAN->MBX_CTRL.FCTRL.TX_RX.STD.ID[1] >> 5))
+#define _CAN_GET_STD_ID_0								(((uint32_t)MODULE_CAN_0->MBX_CTRL.FCTRL.TX_RX.STD.ID[0] << 3) | \
+													(MODULE_CAN_0->MBX_CTRL.FCTRL.TX_RX.STD.ID[1] >> 5))
+#define _CAN_GET_STD_ID_1								(((uint32_t)MODULE_CAN_0->MBX_CTRL.FCTRL.TX_RX.STD.ID[0] << 3) | \
+													(MODULE_CAN_0->MBX_CTRL.FCTRL.TX_RX.STD.ID[1] >> 5))
 
 /** \brief Get extended message ID */
-#define _CAN_GET_EXT_ID   (((uint32_t)MODULE_CAN->MBX_CTRL.FCTRL.TX_RX.EXT.ID[0] << 21) | \
-													(MODULE_CAN->MBX_CTRL.FCTRL.TX_RX.EXT.ID[1] << 13) | \
-													(MODULE_CAN->MBX_CTRL.FCTRL.TX_RX.EXT.ID[2] << 5) | \
-													(MODULE_CAN->MBX_CTRL.FCTRL.TX_RX.EXT.ID[3] >> 3 ))
+#define _CAN_GET_EXT_ID_0   (((uint32_t)MODULE_CAN_0->MBX_CTRL.FCTRL.TX_RX.EXT.ID[0] << 21) | \
+													(MODULE_CAN_0->MBX_CTRL.FCTRL.TX_RX.EXT.ID[1] << 13) | \
+													(MODULE_CAN_0->MBX_CTRL.FCTRL.TX_RX.EXT.ID[2] << 5) | \
+													(MODULE_CAN_0->MBX_CTRL.FCTRL.TX_RX.EXT.ID[3] >> 3 ))
+
+#define _CAN_GET_EXT_ID_1   (((uint32_t)MODULE_CAN_1->MBX_CTRL.FCTRL.TX_RX.EXT.ID[0] << 21) | \
+													(MODULE_CAN_1->MBX_CTRL.FCTRL.TX_RX.EXT.ID[1] << 13) | \
+													(MODULE_CAN_1->MBX_CTRL.FCTRL.TX_RX.EXT.ID[2] << 5) | \
+													(MODULE_CAN_1->MBX_CTRL.FCTRL.TX_RX.EXT.ID[3] >> 3 ))
 
 /** \brief Set standard message ID */
-#define _CAN_SET_STD_ID(x)							MODULE_CAN->MBX_CTRL.FCTRL.TX_RX.STD.ID[0] = ((x) >> 3);	\
-													MODULE_CAN->MBX_CTRL.FCTRL.TX_RX.STD.ID[1] = ((x) << 5);
+#define _CAN_SET_STD_ID_0(x)							MODULE_CAN_0->MBX_CTRL.FCTRL.TX_RX.STD.ID[0] = ((x) >> 3);	\
+													MODULE_CAN_0->MBX_CTRL.FCTRL.TX_RX.STD.ID[1] = ((x) << 5);
+
+#define _CAN_SET_STD_ID_1(x)							MODULE_CAN_1->MBX_CTRL.FCTRL.TX_RX.STD.ID[0] = ((x) >> 3);	\
+													MODULE_CAN_1->MBX_CTRL.FCTRL.TX_RX.STD.ID[1] = ((x) << 5);
 
 /** \brief Set extended message ID */
-#define _CAN_SET_EXT_ID(x)							MODULE_CAN->MBX_CTRL.FCTRL.TX_RX.EXT.ID[0] = ((x) >> 21);	\
-													MODULE_CAN->MBX_CTRL.FCTRL.TX_RX.EXT.ID[1] = ((x) >> 13);	\
-													MODULE_CAN->MBX_CTRL.FCTRL.TX_RX.EXT.ID[2] = ((x) >> 5);	\
-													MODULE_CAN->MBX_CTRL.FCTRL.TX_RX.EXT.ID[3] = ((x) << 3);	\
+#define _CAN_SET_EXT_ID_0(x)							MODULE_CAN_0->MBX_CTRL.FCTRL.TX_RX.EXT.ID[0] = ((x) >> 21);	\
+													MODULE_CAN_0->MBX_CTRL.FCTRL.TX_RX.EXT.ID[1] = ((x) >> 13);	\
+													MODULE_CAN_0->MBX_CTRL.FCTRL.TX_RX.EXT.ID[2] = ((x) >> 5);	\
+													MODULE_CAN_0->MBX_CTRL.FCTRL.TX_RX.EXT.ID[3] = ((x) << 3);	\
+
+#define _CAN_SET_EXT_ID_1(x)							MODULE_CAN_1->MBX_CTRL.FCTRL.TX_RX.EXT.ID[0] = ((x) >> 21);	\
+													MODULE_CAN_1->MBX_CTRL.FCTRL.TX_RX.EXT.ID[1] = ((x) >> 13);	\
+													MODULE_CAN_1->MBX_CTRL.FCTRL.TX_RX.EXT.ID[2] = ((x) >> 5);	\
+													MODULE_CAN_1->MBX_CTRL.FCTRL.TX_RX.EXT.ID[3] = ((x) << 3);	\
 
 /** \brief Interrupt status register */
 typedef enum  {
