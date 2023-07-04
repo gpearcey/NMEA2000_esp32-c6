@@ -41,14 +41,6 @@ before including NMEA2000_esp32.h or NMEA2000_CAN.h
 #include "driver/gpio.h"
 #include "NMEA2000.h"
 #include "N2kMsg.h"
-#include "ESP32_CAN_def.h"
-
-#ifndef ESP32_CAN_TX_PIN
-#define ESP32_CAN_TX_PIN GPIO_NUM_4
-#endif
-#ifndef ESP32_CAN_RX_PIN
-#define ESP32_CAN_RX_PIN GPIO_NUM_5
-#endif
 
 class tNMEA2000_esp32c6 : public tNMEA2000
 {
@@ -65,14 +57,13 @@ protected:
   };
 
 protected:
-	CAN_speed_t    speed;	
   gpio_num_t     TxPin;	
   gpio_num_t     RxPin;
   QueueHandle_t  RxQueue;
   QueueHandle_t  TxQueue;
 
 protected:
-  void CAN_read_frame(); // Read frame to queue within interrupt
+
   void CAN_send_frame(tCANFrame &frame); // Send frame
   void CAN_init();
 
@@ -83,9 +74,10 @@ protected:
   virtual void InitCANFrameBuffers();
 
 public:
-  tNMEA2000_esp32c6(gpio_num_t _TxPin=ESP32_CAN_TX_PIN,  gpio_num_t _RxPin=ESP32_CAN_RX_PIN);
+  tNMEA2000_esp32c6(gpio_num_t _TxPin,  gpio_num_t _RxPin);
 
   void InterruptHandler();
+  void CAN_read_frame(); // Read frame to queue within interrupt
 };
 
 #endif
