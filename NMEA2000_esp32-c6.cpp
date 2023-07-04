@@ -256,7 +256,6 @@ void tNMEA2000_esp32c6::CAN_read_frame() {
 
 //*****************************************************************************
 void tNMEA2000_esp32c6::CAN_send_frame(tCANFrame &frame) {
-  printf("CAN_Send_frame");
   CAN_FIR_t FIR;
 
   FIR.U=0;
