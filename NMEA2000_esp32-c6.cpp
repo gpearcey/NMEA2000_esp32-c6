@@ -50,22 +50,15 @@ can.h library, which may cause even naming problem.
 bool tNMEA2000_esp32c6::CanInUse=false;
 tNMEA2000_esp32c6 *pNMEA2000_esp32=0;
 
-void ESP32Can1Interrupt(void *);
-
 //*****************************************************************************
 tNMEA2000_esp32c6::tNMEA2000_esp32c6(gpio_num_t _TxPin,  gpio_num_t _RxPin) :
     tNMEA2000(), IsOpen(false),
-                                                                         speed(CAN_SPEED_250KBPS), TxPin(_TxPin), RxPin(_RxPin),
+                                                                         TxPin(_TxPin), RxPin(_RxPin),
     RxQueue(NULL), TxQueue(NULL) {}
 
 //*****************************************************************************
 bool tNMEA2000_esp32c6::CANSendFrame(unsigned long id, unsigned char len, const unsigned char *buf, bool /*wait_sent*/) {
   if ( uxQueueSpacesAvailable(TxQueue)==0 ) return false; // can not send to queue
-
-  //tCANFrame frame;
-  //frame.id=id;
-  //frame.len=len>8?8:len;
-  //memcpy(frame.buf,buf,len);
 
   twai_message_t message;
   message.identifier = id;
@@ -75,11 +68,10 @@ bool tNMEA2000_esp32c6::CANSendFrame(unsigned long id, unsigned char len, const 
 
   //Queue message for transmission
   if (twai_transmit(&message, pdMS_TO_TICKS(1000)) == ESP_OK) {
-      printf("Message queued for transmission\n");
+      return true;
   } else {
-      printf("Failed to queue message for transmission\n");
+      return false;
   }
-
   return true;
 }
 
@@ -112,7 +104,6 @@ bool tNMEA2000_esp32c6::CANOpen() {
 
 //*****************************************************************************
 bool tNMEA2000_esp32c6::CANGetFrame(unsigned long &id, unsigned char &len, unsigned char *buf) {
-  //CAN_read_frame();
   bool HasFrame=false;
   tCANFrame frame;
 
@@ -122,7 +113,6 @@ bool tNMEA2000_esp32c6::CANGetFrame(unsigned long &id, unsigned char &len, unsig
       id=frame.id;
       len=frame.len;
       memcpy(buf,frame.buf,frame.len);
-      printf("frame received\n");
   }
 
   return HasFrame;
@@ -131,23 +121,26 @@ bool tNMEA2000_esp32c6::CANGetFrame(unsigned long &id, unsigned char &len, unsig
 //*****************************************************************************
 void tNMEA2000_esp32c6::CAN_init() {
     //Initialize configuration structures using macro initializers
-    twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT(GPIO_NUM_4, GPIO_NUM_5, TWAI_MODE_NORMAL);
+    twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT(TxPin, RxPin, TWAI_MODE_NORMAL);
     twai_timing_config_t t_config = TWAI_TIMING_CONFIG_250KBITS();
     twai_filter_config_t f_config = TWAI_FILTER_CONFIG_ACCEPT_ALL();
 
     //Install TWAI driver
     if (twai_driver_install(&g_config, &t_config, &f_config) == ESP_OK) {
-        printf("Driver installed\n");
+
     } else {
-        printf("Failed to install driver\n");
+        // TODO - implement error handling
         return;
     }
 
+    //install CAN ISR - this needs to get called from twai_driver_install(if it's going to work)
+    //esp_intr_alloc(46, 0, ESP32Can1Interrupt, NULL, NULL); 
+
     //Start TWAI driver
     if (twai_start() == ESP_OK) {
-        printf("Driver started\n");
+
     } else {
-        printf("Failed to start driver\n");
+        // TODO - implement error handling
         return;
     }
 }
@@ -155,15 +148,12 @@ void tNMEA2000_esp32c6::CAN_init() {
 //*****************************************************************************
 void tNMEA2000_esp32c6::CAN_read_frame() {
   tCANFrame frame;
-  CAN_FIR_t FIR;
 
   //Wait for message to be received
   twai_message_t message;
-  if (twai_receive(&message, pdMS_TO_TICKS(10000)) == ESP_OK) {
-      printf("Message received\n");
-      printf("Message id %ld \n", message.identifier);
+  if (twai_receive(&message, pdMS_TO_TICKS(1000)) == ESP_OK) {
   } else {
-      printf("Failed to receive message\n");
+      // TODO - implement error handling
       return;
   }
 
@@ -180,72 +170,7 @@ void tNMEA2000_esp32c6::CAN_read_frame() {
 
     //send frame to input queue
     xQueueSendToBackFromISR(RxQueue,&frame,0);
-    printf("frame added to RxQueue \n");
   }
 
 }
 
-//*****************************************************************************
-void tNMEA2000_esp32c6::CAN_send_frame(tCANFrame &frame) {
-  printf("CAN_Send_frame");
-  CAN_FIR_t FIR;
-
-  FIR.U=0;
-  FIR.B.DLC=frame.len>8?8:frame.len;
-  FIR.B.FF=CAN_frame_ext;
-
-	//copy frame information record
-	MODULE_CAN_0->MBX_CTRL.FCTRL.FIR.U=FIR.U;
-
-  //Write message ID
-  _CAN_SET_EXT_ID_0(frame.id);
-
-  // Copy the frame data to the hardware
-  for ( size_t i=0; i<frame.len; i++) {
-    MODULE_CAN_0->MBX_CTRL.FCTRL.TX_RX.EXT.data[i]=frame.buf[i];
-  }
-
-  // Transmit frame
-  MODULE_CAN_0->CMR.B.TR=1;
-}
-
-//*****************************************************************************
-void tNMEA2000_esp32c6::InterruptHandler() {
-  printf("interupt handler calledddddddddddddd");
-  CAN_read_frame();
-	//Interrupt flag buffer
-  uint32_t interrupt;
-
-  // Read interrupt status and clear flags
-  interrupt = (MODULE_CAN_0->IR.U & 0xff);
-
-  // Handle TX complete interrupt
-    if ((interrupt & __CAN_IRQ_TX) != 0) {
-    tCANFrame frame;
-      if ( (xQueueReceiveFromISR(TxQueue,&frame,NULL)==pdTRUE) ) {
-      CAN_send_frame(frame);
-    }
-  }
-
-  // Handle RX frame available interrupt
-    if ((interrupt & __CAN_IRQ_RX) != 0) {
-    CAN_read_frame();
-  }
-
-  // Handle error interrupts.
-    if ((interrupt & (__CAN_IRQ_ERR						//0x4
-                      | __CAN_IRQ_DATA_OVERRUN			//0x8
-                      | __CAN_IRQ_WAKEUP				//0x10
-                      | __CAN_IRQ_ERR_PASSIVE			//0x20
-                      | __CAN_IRQ_ARB_LOST				//0x40
-                      | __CAN_IRQ_BUS_ERR				//0x80
-        )) != 0) {
-    /*handler*/
-  }
-}
-
-//*****************************************************************************
-void ESP32Can1Interrupt(void *) {
-  printf("interrupt handler called");
-  pNMEA2000_esp32->InterruptHandler();
-}
