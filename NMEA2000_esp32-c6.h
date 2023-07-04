@@ -72,7 +72,7 @@ protected:
   QueueHandle_t  TxQueue;
 
 protected:
-  void CAN_read_frame(); // Read frame to queue within interrupt
+
   void CAN_send_frame(tCANFrame &frame); // Send frame
   void CAN_init();
 
@@ -86,6 +86,7 @@ public:
   tNMEA2000_esp32c6(gpio_num_t _TxPin=ESP32_CAN_TX_PIN,  gpio_num_t _RxPin=ESP32_CAN_RX_PIN);
 
   void InterruptHandler();
+  void CAN_read_frame(); // Read frame to queue within interrupt
 };
 
 #endif
