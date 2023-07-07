@@ -39,6 +39,7 @@ before including NMEA2000_esp32.h or NMEA2000_CAN.h
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "driver/gpio.h"
+#include "driver/twai.h"
 #include "NMEA2000.h"
 #include "N2kMsg.h"
 
@@ -78,6 +79,9 @@ public:
 
   void InterruptHandler();
   void CAN_read_frame(); // Read frame to queue within interrupt
+  esp_err_t GetTwaiStatus(twai_status_info_t &status_info);
+  esp_err_t ConfigureAlerts(uint32_t alerts_to_enable);
+  esp_err_t ReadAlerts(uint32_t &alerts_triggered, TickType_t ticks_to_wait);
 };
 
 #endif

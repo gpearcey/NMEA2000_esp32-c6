@@ -174,3 +174,35 @@ void tNMEA2000_esp32c6::CAN_read_frame() {
 
 }
 
+//******************************************************************************************
+
+/**
+ * \brief retrives twai status
+ * @param[out] status_info
+ * \return ESP_OK: Status information retrieved, ESP_ERR_INVALID_AGR: arguments are invalid, ESP_ERR_INVALID_STATE:TWAI driver not installed
+*/
+esp_err_t tNMEA2000_esp32c6::GetTwaiStatus(twai_status_info_t &status_info){
+  esp_err_t result = twai_get_status_info(&status_info);
+  return result;
+}
+
+/**
+ * \brief Sets twai alerts
+ * @param[in] alerts_enabled
+ * \return ESP_OK: Status information retrieved, ESP_ERR_INVALID_AGR: arguments are invalid, ESP_ERR_INVALID_STATE:TWAI driver not installed
+*/
+esp_err_t tNMEA2000_esp32c6::ConfigureAlerts(uint32_t alerts_to_enable){
+  esp_err_t result = twai_reconfigure_alerts(alerts_to_enable, NULL);
+  return result;
+}
+
+/**
+ * \brief Reads twai alerts
+ * @param[out] alerts_triggered
+ * @param[in] ticks_to_wait
+ * \return ESP_OK: Status information retrieved, ESP_ERR_INVALID_AGR: arguments are invalid, ESP_ERR_INVALID_STATE:TWAI driver not installed
+*/
+esp_err_t tNMEA2000_esp32c6::ReadAlerts(uint32_t &alerts_triggered, TickType_t ticks_to_wait){
+  esp_err_t result = twai_read_alerts(&alerts_triggered, ticks_to_wait);
+  return result;
+}
