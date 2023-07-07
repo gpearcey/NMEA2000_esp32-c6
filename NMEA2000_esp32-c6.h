@@ -79,8 +79,25 @@ public:
 
   void InterruptHandler();
   void CAN_read_frame(); // Read frame to queue within interrupt
+/**
+ * \brief retrives twai status
+ * @param[out] status_info
+ * \return ESP_OK: Status information retrieved, ESP_ERR_INVALID_AGR: arguments are invalid, ESP_ERR_INVALID_STATE:TWAI driver not installed
+*/
   esp_err_t GetTwaiStatus(twai_status_info_t &status_info);
+/**
+ * \brief Sets twai alerts
+ * @param[in] alerts_enabled
+ * \return ESP_OK: Status information retrieved, ESP_ERR_INVALID_AGR: arguments are invalid, ESP_ERR_INVALID_STATE:TWAI driver not installed
+*/
   esp_err_t ConfigureAlerts(uint32_t alerts_to_enable);
+
+/**
+ * \brief Reads twai alerts
+ * @param[out] alerts_triggered
+ * @param[in] ticks_to_wait
+ * \return ESP_OK: Status information retrieved, ESP_ERR_INVALID_AGR: arguments are invalid, ESP_ERR_INVALID_STATE:TWAI driver not installed
+*/
   esp_err_t ReadAlerts(uint32_t &alerts_triggered, TickType_t ticks_to_wait);
 };
 
