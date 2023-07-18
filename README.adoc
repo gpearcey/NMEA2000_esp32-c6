@@ -3,7 +3,7 @@
 Inherited object for use NMEA2000 library for ESP32 Boards.
 See also https://github.com/ttlappalainen/NMEA2000[NMEA2000] library.
 
-To use this library, you will also need [my fork of the NMEA2000 library](https://github.com/gpearcey/NMEA2000).
+To use this library, you will also need https://github.com/gpearcey/NMEA2000[[my fork of the NMEA2000 library].
 
 This library uses the esp32 twai driver for TWAI0. No driver has yet been implemented by espressif for TWAI1. 
 
